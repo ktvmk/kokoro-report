@@ -231,6 +231,7 @@ function initAuth() {
 function openAuthModal(mode = 'signin') {
   const modal = document.getElementById('authModal');
   if (!modal) return;
+  modal.removeAttribute('hidden');
   setAuthTab(mode);
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
@@ -243,6 +244,7 @@ function closeAuthModal() {
   modal.classList.remove('is-open');
   modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('auth-open');
+  modal.setAttribute('hidden', '');
 }
 
 function setAuthTab(mode) {
