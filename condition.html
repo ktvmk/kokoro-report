@@ -1,0 +1,163 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>ココロ予報 | 今日のコンディション</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=20260313204058">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="./data.js?v=20260313203810" defer></script>
+  <script src="./app.js?v=20260313203810" defer></script>
+</head>
+<body data-page="condition">
+  <header class="hero" id="top">
+    <h1 class="app-title app-title--top">天気を予報するように今の自分の状態を予測する"ココロ予報"</h1>
+    <div class="site-header site-header--stack">
+      <img class="header-cover" src="./logo5.png?v=20260313203810" alt="ココロ予報 カバー画像">
+    </div>
+    <nav class="main-nav main-nav--tabs header-tabs">
+      <a href="index.html#top">心予報</a>
+      <a href="index.html">あなたの情報</a>
+      <a href="condition.html" class="active">今日のコンディション</a>
+      <a href="graphs.html">グラフ</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card" id="dailyLog">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 03</p>
+          <h2>今日のコンディションを記録</h2>
+        </div>
+        <div class="section-actions">
+          <button class="secondary" id="loadDemo">デモデータを入力</button>
+          <button class="ghost" id="clearEntries">保存データを削除</button>
+        </div>
+      </div>
+
+      <form id="logForm" class="log-form">
+        <div class="form-block">
+          <h3>1. 体調データ</h3>
+          <div class="form-grid">
+            <label>心拍数 (bpm)
+              <input type="number" name="heartRate" min="40" max="180" required>
+            </label>
+            <label>血圧 (例: 120/80)
+              <input type="text" name="bloodPressure" placeholder="120/80" required>
+            </label>
+            <label>睡眠時間 (時間)
+              <input type="number" name="sleepHours" min="0" max="15" value="7" required>
+            </label>
+            <label>睡眠時間 (分)
+              <input type="number" name="sleepMinutes" min="0" max="59" value="0" required>
+            </label>
+            <label>運動時間 (分)
+              <input type="number" name="exerciseMinutes" min="0" max="300" value="0" required>
+            </label>
+            <fieldset class="checkbox-group">
+              <legend>症状</legend>
+              <label><input type="checkbox" name="symptoms" value="頭痛">頭痛</label>
+              <label><input type="checkbox" name="symptoms" value="肩こり">肩こり</label>
+              <label><input type="checkbox" name="symptoms" value="胃痛">胃痛</label>
+              <label><input type="checkbox" name="symptoms" value="だるさ">だるさ</label>
+              <label><input type="checkbox" name="symptoms" value="特にない" checked>特にない</label>
+            </fieldset>
+          </div>
+        </div>
+
+        <div class="form-block">
+          <h3>2. 食事</h3>
+          <div class="form-grid">
+            <label>食事バランススコア (-10 〜 +10)
+              <input type="range" name="dietHealth" min="-10" max="10" value="0" data-range-id="dietHealth">
+              <div class="range-display" data-display-for="dietHealth">0</div>
+            </label>
+            <fieldset class="checkbox-group">
+              <legend>味の傾向</legend>
+              <label><input type="checkbox" name="flavors" value="甘い">甘い</label>
+              <label><input type="checkbox" name="flavors" value="辛い">辛い</label>
+              <label><input type="checkbox" name="flavors" value="脂っこい">脂っこい</label>
+              <label><input type="checkbox" name="flavors" value="しょっぱい">しょっぱい</label>
+              <label><input type="checkbox" name="flavors" value="すっぱい">すっぱい</label>
+              <label><input type="checkbox" name="flavors" value="さっぱり">さっぱり</label>
+              <label><input type="checkbox" name="flavors" value="健康志向">健康志向</label>
+              <label><input type="checkbox" name="flavors" value="和食">和食</label>
+            </fieldset>
+            <label class="toggle">飲酒
+              <input type="checkbox" name="alcohol">
+            </label>
+            <label class="toggle">カフェイン
+              <input type="checkbox" name="caffeine">
+            </label>
+          </div>
+        </div>
+
+        <div class="form-block">
+          <h3>3. 気分とストレス</h3>
+          <div class="slider-grid" id="mindSliders"></div>
+        </div>
+
+        <div class="form-block">
+          <h3>4. ストレス対応スイッチ</h3>
+          <p class="section-lead">強度と、実行後のスッキリ度を入力してください（-10 〜 +10）。</p>
+          <div class="switch-grid" id="switchSliders"></div>
+        </div>
+
+        <div class="form-block">
+          <h3>5. 日記</h3>
+          <textarea name="diary" rows="4" placeholder="今日の出来事や気づきを記録"></textarea>
+        </div>
+
+        <button class="primary" type="submit">今日の記録を保存する</button>
+      </form>
+    </section>
+
+    <section class="card" id="recommendations">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 07</p>
+          <h2>今日の疲れタイプと提案</h2>
+        </div>
+      </div>
+      <div class="recommendation-grid" id="fatigueSummary">
+        <p>記録を保存すると、ここに疲れタイプと提案が表示されます。</p>
+      </div>
+      <div class="suggestion-grid" id="patternSuggestions"></div>
+    </section>
+
+    <section class="card" id="entries">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">History</p>
+          <h2>保存済みの記録</h2>
+        </div>
+      </div>
+      <div class="entry-list" id="entryList"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 ココロ予報</p>
+  </footer>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

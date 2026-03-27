@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>天気を予報するように今の自分の状態を予測する"ココロ予報"</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=20260313204058">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="./data.js?v=20260313203810" defer></script>
+  <script src="./app.js?v=20260313203810" defer></script>
+</head>
+<body data-page="profile">
+  <header class="hero" id="top">
+    <h1 class="app-title app-title--top">天気を予報するように今の自分の状態を予測する"ココロ予報"</h1>
+    <div class="site-header site-header--stack">
+      <img class="header-cover" src="./logo5.png?v=20260313203810" alt="ココロ予報 カバー画像">
+    </div>
+    <nav class="main-nav main-nav--tabs header-tabs">
+      <a href="index.html#top">心予報</a>
+      <a href="index.html" class="active">あなたの情報</a>
+      <a href="condition.html">今日のコンディション</a>
+      <a href="graphs.html">グラフ</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card" id="diagnosis">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 01</p>
+          <h2>ストレス対応タイプ診断</h2>
+        </div>
+        <button class="secondary" id="resetPreferences">入力をリセット</button>
+      </div>
+
+      <div class="diagnosis-steps">
+        <article class="diagnosis-step">
+          <h3>Step 1: 基本タイプの診断 (A〜F)</h3>
+          <p class="section-lead">まずは各質問を-10〜+10で評価して、今の傾向を確認します。</p>
+          <div class="question-list" id="step1Questions"></div>
+        </article>
+
+        <article class="diagnosis-step">
+          <h3>Step 2: プラス10点の詳細調整</h3>
+          <p class="section-lead">Step 1の結果を見ながら、しっくりくる項目を強調してください。</p>
+          <div class="question-list" id="step2Questions"></div>
+        </article>
+
+        <article class="diagnosis-step diagnosis-step--full">
+          <h3>Step 3: +10補正 (G / H / 追加アプローチ)</h3>
+          <p class="section-lead">追加で合うと感じる方向があれば、最後に反映します。</p>
+          <div class="question-list" id="step3Questions"></div>
+        </article>
+      </div>
+
+      <div class="diagnosis__action">
+        <button class="primary" id="runDiagnosis">ストレス対応タイプを診断</button>
+        <div class="diagnosis__result" id="diagnosisResult">
+          <p>入力が完了したら、あなたのタイプをここに表示します。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="typeLibrary">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 02</p>
+          <h2>タイプ別リファレンス</h2>
+        </div>
+        <p class="section-lead">診断結果に応じて、使いやすいカードを確認できます。</p>
+      </div>
+      <div class="type-grid" id="typeGrid"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 ココロ予報</p>
+  </footer>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+

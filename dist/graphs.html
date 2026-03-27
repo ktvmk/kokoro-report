@@ -1,0 +1,80 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>ココロ予報 | グラフ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css?v=20260313204058">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="./data.js?v=20260313203810" defer></script>
+  <script src="./app.js?v=20260313203810" defer></script>
+</head>
+<body data-page="graphs">
+  <header class="hero" id="top">
+    <h1 class="app-title app-title--top">天気を予報するように今の自分の状態を予測する"ココロ予報"</h1>
+    <div class="site-header site-header--stack">
+      <img class="header-cover" src="./logo5.png?v=20260313203810" alt="ココロ予報 カバー画像">
+    </div>
+    <nav class="main-nav main-nav--tabs header-tabs">
+      <a href="index.html#top">心予報</a>
+      <a href="index.html">あなたの情報</a>
+      <a href="condition.html">今日のコンディション</a>
+      <a href="graphs.html" class="active">グラフ</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card" id="history">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 04</p>
+          <h2>月次グラフとランキング</h2>
+        </div>
+        <div class="section-actions">
+          <label>月を選択
+            <input type="month" id="monthPicker">
+          </label>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="monthlyChart" width="400" height="240"></canvas>
+      </div>
+      <div class="ranking" id="switchRanking"></div>
+    </section>
+
+    <section class="card" id="insights">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Insights</p>
+          <h2>見方のヒント</h2>
+        </div>
+      </div>
+      <p>気分が下がった日と、実行したスイッチ・生活データの関係を見比べると、再現しやすい対策が見つかります。</p>
+      <p>まだ記録がない場合は <a href="condition.html">今日のコンディション</a> から入力してください。</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 ココロ予報</p>
+  </footer>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
