@@ -1,5 +1,8 @@
-const STORAGE_KEY = 'kororo-entries-v1';
-const PREF_KEY = 'kororo-preferences-v1';
+const STORAGE_KEY_BASE = 'kororo-entries-v1';
+const PREF_KEY_BASE = 'kororo-preferences-v1';
+const USERS_KEY = 'kororo-users-v1';
+const CURRENT_USER_KEY = 'kororo-current-user-v1';
+const MAX_PROFILE_PHOTO_SIZE = 2 * 1024 * 1024;
 const CATEGORY_TO_SWITCH = {
   A: 'movement',
   B: 'reward',
@@ -15,6 +18,50 @@ const state = {
   entries: [],
   preferences: {}
 };
+
+function getCurrentUser() {
+  const stored = localStorage.getItem(CURRENT_USER_KEY);
+  return stored ? JSON.parse(stored) : null;
+}
+
+function setCurrentUser(user) {
+  if (user) {
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(CURRENT_USER_KEY);
+  }
+}
+
+function getScopedKey(base) {
+  const user = getCurrentUser();
+  const suffix = user?.id || 'guest';
+  return `${base}-${suffix}`;
+}
+
+function getUsers() {
+  const stored = localStorage.getItem(USERS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function migrateLegacyStorage() {
+  const legacyEntries = localStorage.getItem(STORAGE_KEY_BASE);
+  const guestEntriesKey = `${STORAGE_KEY_BASE}-guest`;
+  if (legacyEntries && !localStorage.getItem(guestEntriesKey)) {
+    localStorage.setItem(guestEntriesKey, legacyEntries);
+    localStorage.removeItem(STORAGE_KEY_BASE);
+  }
+
+  const legacyPrefs = localStorage.getItem(PREF_KEY_BASE);
+  const guestPrefsKey = `${PREF_KEY_BASE}-guest`;
+  if (legacyPrefs && !localStorage.getItem(guestPrefsKey)) {
+    localStorage.setItem(guestPrefsKey, legacyPrefs);
+    localStorage.removeItem(PREF_KEY_BASE);
+  }
+}
 
 let monthlyChart;
 let vitalsChart;
@@ -36,6 +83,7 @@ function initApp() {
     renderTypeGrid();
   }
   attachGlobalHandlers();
+  initAuth();
   loadState();
   if (
     document.getElementById('monthlyChart') ||
@@ -145,6 +193,193 @@ function attachGlobalHandlers() {
   if (scrollDiag) scrollDiag.addEventListener('click', () => scrollToSection('diagnosis'));
 }
 
+// -----------------------------------------------------------------------------
+// Auth
+function initAuth() {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+
+  document.querySelectorAll('[data-auth-open]').forEach((button) => {
+    button.addEventListener('click', () => openAuthModal(button.dataset.authOpen));
+  });
+
+  modal.querySelectorAll('[data-close-auth]').forEach((button) => {
+    button.addEventListener('click', closeAuthModal);
+  });
+
+  modal.querySelectorAll('[data-auth-tab]').forEach((button) => {
+    button.addEventListener('click', () => setAuthTab(button.dataset.authTab));
+  });
+
+  const signInForm = document.getElementById('signInForm');
+  if (signInForm) signInForm.addEventListener('submit', handleSignIn);
+
+  const signUpForm = document.getElementById('signUpForm');
+  if (signUpForm) signUpForm.addEventListener('submit', handleSignUp);
+
+  const signOutButton = document.querySelector('[data-auth-signout]');
+  if (signOutButton) signOutButton.addEventListener('click', handleSignOut);
+
+  const birthYearInput = document.querySelector('input[name="birthYear"]');
+  if (birthYearInput) {
+    birthYearInput.max = new Date().getFullYear();
+  }
+
+  applyAuthState();
+}
+
+function openAuthModal(mode = 'signin') {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  setAuthTab(mode);
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('auth-open');
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('auth-open');
+}
+
+function setAuthTab(mode) {
+  const modal = document.getElementById('authModal');
+  if (!modal) return;
+  modal.querySelectorAll('[data-auth-tab]').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.authTab === mode);
+  });
+  modal.querySelectorAll('[data-auth-panel]').forEach((panel) => {
+    panel.classList.toggle('is-active', panel.dataset.authPanel === mode);
+  });
+}
+
+function applyAuthState() {
+  const user = getCurrentUser();
+  document.body.dataset.authState = user ? 'logged-in' : 'logged-out';
+  const nameEl = document.querySelector('[data-auth-name]');
+  if (nameEl) nameEl.textContent = user?.accountName || user?.email || '';
+}
+
+function handleSignIn(event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+  const email = String(formData.get('email') || '').trim().toLowerCase();
+  const password = String(formData.get('password') || '');
+
+  if (!email || !password) {
+    alert('メールアドレスとパスワードを入力してください。');
+    return;
+  }
+
+  const users = getUsers();
+  const user = users.find((item) => item.email === email && item.password === password);
+  if (!user) {
+    alert('メールアドレスまたはパスワードが違います。');
+    return;
+  }
+
+  setCurrentUser({
+    id: user.id,
+    email: user.email,
+    accountName: user.accountName,
+    profilePhoto: user.profilePhoto || ''
+  });
+  loadState();
+  updateUI();
+  applyAuthState();
+  closeAuthModal();
+  form.reset();
+}
+
+async function handleSignUp(event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+
+  const email = String(formData.get('email') || '').trim().toLowerCase();
+  const password = String(formData.get('password') || '');
+  const accountName = String(formData.get('accountName') || '').trim();
+  const birthYear = Number(formData.get('birthYear'));
+  const birthMonth = Number(formData.get('birthMonth'));
+  const gender = String(formData.get('gender') || '');
+
+  if (!email || !password || !accountName || !birthYear || !birthMonth || !gender) {
+    alert('必須項目をすべて入力してください。');
+    return;
+  }
+
+  const users = getUsers();
+  if (users.some((item) => item.email === email)) {
+    alert('このメールアドレスは既に登録されています。');
+    return;
+  }
+
+  let profilePhoto = '';
+  const photoInput = form.querySelector('input[name="profilePhoto"]');
+  const file = photoInput?.files?.[0];
+  if (file) {
+    if (file.size > MAX_PROFILE_PHOTO_SIZE) {
+      alert('プロフィール写真は2MB以下の画像にしてください。');
+      return;
+    }
+    profilePhoto = await readFileAsDataURL(file);
+  }
+
+  const user = {
+    id: createUserId(),
+    email,
+    password,
+    accountName,
+    birthYear,
+    birthMonth,
+    gender,
+    profilePhoto,
+    createdAt: new Date().toISOString()
+  };
+
+  users.push(user);
+  saveUsers(users);
+  setCurrentUser({
+    id: user.id,
+    email: user.email,
+    accountName: user.accountName,
+    profilePhoto: user.profilePhoto || ''
+  });
+  loadState();
+  updateUI();
+  applyAuthState();
+  closeAuthModal();
+  form.reset();
+  alert('登録が完了しました。');
+}
+
+function handleSignOut() {
+  setCurrentUser(null);
+  loadState();
+  updateUI();
+  applyAuthState();
+}
+
+function createUserId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return `user-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function handleRangeInput(event) {
   const id = event.target.dataset.rangeId;
   if (!id) return;
@@ -227,7 +462,7 @@ function resetDiagnosisInputs() {
     if (display) display.textContent = '0';
   });
   state.preferences = {};
-  localStorage.removeItem(PREF_KEY);
+  localStorage.removeItem(getScopedKey(PREF_KEY_BASE));
   document.getElementById('diagnosisResult').innerHTML = '<p>入力が完了したら、あなたのタイプをここに表示します。</p>';
   highlightTypeCards([]);
 }
@@ -310,21 +545,22 @@ function scrollToSection(id) {
 // -----------------------------------------------------------------------------
 // State persistence
 function loadState() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  migrateLegacyStorage();
+  const stored = localStorage.getItem(getScopedKey(STORAGE_KEY_BASE));
   state.entries = stored ? JSON.parse(stored) : [];
 
-  const pref = localStorage.getItem(PREF_KEY);
+  const pref = localStorage.getItem(getScopedKey(PREF_KEY_BASE));
   state.preferences = pref ? JSON.parse(pref) : {};
   applyStoredPreferences();
 }
 
 function saveEntries() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+  localStorage.setItem(getScopedKey(STORAGE_KEY_BASE), JSON.stringify(state.entries));
 }
 
 function savePreferenceValue(questionId, value) {
   state.preferences[questionId] = value;
-  localStorage.setItem(PREF_KEY, JSON.stringify(state.preferences));
+  localStorage.setItem(getScopedKey(PREF_KEY_BASE), JSON.stringify(state.preferences));
 }
 
 function applyStoredPreferences() {
