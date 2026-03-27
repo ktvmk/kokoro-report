@@ -18,6 +18,7 @@ const state = {
 
 let monthlyChart;
 let vitalsChart;
+let sleepExerciseChart;
 
 document.addEventListener('DOMContentLoaded', initApp);
 
@@ -36,7 +37,11 @@ function initApp() {
   }
   attachGlobalHandlers();
   loadState();
-  if (document.getElementById('monthlyChart') || document.getElementById('vitalsChart')) {
+  if (
+    document.getElementById('monthlyChart') ||
+    document.getElementById('vitalsChart') ||
+    document.getElementById('sleepExerciseChart')
+  ) {
     initChart();
   }
   updateUI();
@@ -294,6 +299,7 @@ function handleMonthChange(event) {
   const month = event.target.value;
   updateChart(month);
   updateVitalsChart(month);
+  updateSleepExerciseChart(month);
   updateRanking(month);
 }
 
@@ -401,13 +407,14 @@ function updateUI() {
   }
 
   const monthPicker = document.getElementById('monthPicker');
-  if (monthlyChart || vitalsChart) {
+  if (monthlyChart || vitalsChart || sleepExerciseChart) {
     const month = monthPicker?.value || getCurrentMonth();
     if (monthPicker && !monthPicker.value) {
       ensureMonthValue(month);
     }
     updateChart(month);
     updateVitalsChart(month);
+    updateSleepExerciseChart(month);
     if (document.getElementById('switchRanking')) {
       updateRanking(month);
     }
@@ -538,30 +545,6 @@ function initChart() {
             tension: 0.3,
             fill: false,
             yAxisID: 'yVitals'
-          },
-          {
-            label: '睡眠時間 (時間)',
-            data: [],
-            borderColor: '#00a4a6',
-            tension: 0.3,
-            fill: false,
-            yAxisID: 'yHours'
-          },
-          {
-            label: '睡眠時間 (分)',
-            data: [],
-            borderColor: '#69bce6',
-            tension: 0.3,
-            fill: false,
-            yAxisID: 'yMinutes'
-          },
-          {
-            label: '運動時間 (分)',
-            data: [],
-            borderColor: '#f2b84b',
-            tension: 0.3,
-            fill: false,
-            yAxisID: 'yMinutes'
           }
         ]
       },
@@ -578,25 +561,73 @@ function initChart() {
             suggestedMin: 40,
             suggestedMax: 140,
             grid: { drawBorder: false }
-          },
-          yHours: {
-            position: 'right',
-            title: { display: true, text: '睡眠 (時間)' },
-            suggestedMin: 0,
-            suggestedMax: 12,
-            grid: { drawOnChartArea: false }
-          },
-          yMinutes: {
-            position: 'right',
-            offset: true,
-            title: { display: true, text: '分 (睡眠/運動)' },
-            suggestedMin: 0,
-            suggestedMax: 300,
-            grid: { drawOnChartArea: false }
           }
         },
         plugins: {
           legend: { display: true }
+        }
+      }
+    });
+  }
+
+  const sleepExerciseCanvas = document.getElementById('sleepExerciseChart');
+  if (sleepExerciseCanvas) {
+    const ctx = sleepExerciseCanvas.getContext('2d');
+    sleepExerciseChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: '睡眠時間',
+            data: [],
+            borderColor: '#00a4a6',
+            tension: 0.3,
+            fill: false
+          },
+          {
+            label: '運動時間',
+            data: [],
+            borderColor: '#f2b84b',
+            tension: 0.3,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+          x: {
+            title: { display: true, text: '日付' }
+          },
+          y: {
+            title: { display: true, text: '時間/分' },
+            suggestedMin: 0,
+            suggestedMax: 900,
+            ticks: {
+              callback: (value) => formatDuration(value)
+            },
+            grid: { drawBorder: false }
+          }
+        },
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const label = context.dataset.label || '';
+                const raw = context.parsed.y;
+                if (label.includes('睡眠')) {
+                  return `${label}: ${formatDuration(raw)}`;
+                }
+                if (label.includes('運動')) {
+                  return `${label}: ${raw}分`;
+                }
+                return `${label}: ${raw}`;
+              }
+            }
+          }
         }
       }
     });
@@ -621,10 +652,17 @@ function updateVitalsChart(month) {
   vitalsChart.data.labels = labels;
   vitalsChart.data.datasets[0].data = monthEntries.map((entry) => entry.body.heartRate);
   vitalsChart.data.datasets[1].data = monthEntries.map((entry) => parseBloodPressure(entry.body.bloodPressure));
-  vitalsChart.data.datasets[2].data = monthEntries.map((entry) => getSleepParts(entry.body.sleepMinutes).hours);
-  vitalsChart.data.datasets[3].data = monthEntries.map((entry) => getSleepParts(entry.body.sleepMinutes).minutes);
-  vitalsChart.data.datasets[4].data = monthEntries.map((entry) => entry.body.exerciseMinutes);
   vitalsChart.update();
+}
+
+function updateSleepExerciseChart(month) {
+  if (!sleepExerciseChart) return;
+  const monthEntries = getEntriesByMonth(month);
+  const labels = monthEntries.map((entry) => new Date(entry.timestamp).getDate());
+  sleepExerciseChart.data.labels = labels;
+  sleepExerciseChart.data.datasets[0].data = monthEntries.map((entry) => entry.body.sleepMinutes);
+  sleepExerciseChart.data.datasets[1].data = monthEntries.map((entry) => entry.body.exerciseMinutes);
+  sleepExerciseChart.update();
 }
 
 function updateRanking(month) {
@@ -1048,12 +1086,13 @@ function formatSleep(minutes) {
   return `${hrs}時間${mins}分`;
 }
 
-function getSleepParts(totalMinutes) {
-  const safeMinutes = Number(totalMinutes) || 0;
-  return {
-    hours: Math.floor(safeMinutes / 60),
-    minutes: safeMinutes % 60
-  };
+function formatDuration(value) {
+  const total = Number(value);
+  if (!Number.isFinite(total)) return '-';
+  const safeMinutes = Math.max(0, Math.round(total));
+  const hrs = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  return `${hrs}時間${mins}分`;
 }
 
 function parseBloodPressure(value) {

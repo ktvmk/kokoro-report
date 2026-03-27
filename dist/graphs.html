@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="./styles.css?v=20260313204058">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
   <script src="./data.js?v=20260313211200" defer></script>
-  <script src="./app.js?v=20260313211200" defer></script>
+  <script src="./app.js?v=20260313213000" defer></script>
 </head>
 <body data-page="graphs">
   <header class="hero" id="top">
@@ -52,11 +52,23 @@
       <div class="section-header">
         <div>
           <p class="eyebrow">Feature 05</p>
-          <h2>体調データの推移</h2>
+          <h2>心拍数・血圧の推移</h2>
         </div>
       </div>
       <div class="chart-wrapper">
         <canvas id="vitalsChart" width="400" height="240"></canvas>
+      </div>
+    </section>
+
+    <section class="card" id="sleep-exercise">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Feature 06</p>
+          <h2>睡眠・運動の推移</h2>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="sleepExerciseChart" width="400" height="240"></canvas>
       </div>
     </section>
 
