@@ -10,10 +10,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260313224000">
+  <link rel="stylesheet" href="./styles.css?v=20260313230000">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-storage-compat.js" defer></script>
+  <script src="./firebase-config.js?v=20260313230000" defer></script>
     <script src="./data.js?v=20260313203810" defer></script>
-  <script src="./app.js?v=20260313225000" defer></script>
+  <script src="./app.js?v=20260313230000" defer></script>
 </head>
 <body data-page="profile">
   <header class="hero" id="top">
@@ -165,7 +170,7 @@
           </div>
 
           <div class="auth-note">
-            <p>入力された情報は、サービス提供と改善のために適切に管理します。現在はこの端末内に保存され、サーバーには送信されません。</p>
+            <p>入力された情報は、サービス提供と改善のために適切に管理します。ログイン中はFirebase（Google Cloud）に保存され、未ログイン時はこの端末内に保存されます。</p>
           </div>
 
           <div class="auth-policy">

@@ -63,13 +63,25 @@ function migrateLegacyStorage() {
   }
 }
 
+function getFirebaseServices() {
+  return window.firebaseServices || null;
+}
+
+function isFirebaseReady() {
+  const services = getFirebaseServices();
+  return Boolean(services?.auth && services?.db);
+}
+
 let monthlyChart;
 let vitalsChart;
 let sleepExerciseChart;
+let preferenceSaveTimer;
 
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', () => {
+  initApp();
+});
 
-function initApp() {
+async function initApp() {
   if (document.getElementById('step1Questions')) {
     renderDiagnosisQuestions();
   }
@@ -84,7 +96,7 @@ function initApp() {
   }
   attachGlobalHandlers();
   initAuth();
-  loadState();
+  await loadState();
   if (
     document.getElementById('monthlyChart') ||
     document.getElementById('vitalsChart') ||
@@ -226,6 +238,15 @@ function initAuth() {
   }
 
   applyAuthState();
+
+  const services = getFirebaseServices();
+  if (services?.auth) {
+    services.auth.onAuthStateChanged((firebaseUser) => {
+      handleFirebaseAuthState(firebaseUser).catch((error) => {
+        console.error('Auth state error', error);
+      });
+    });
+  }
 }
 
 function openAuthModal(mode = 'signin') {
@@ -265,6 +286,34 @@ function applyAuthState() {
   if (nameEl) nameEl.textContent = user?.accountName || user?.email || '';
 }
 
+async function handleFirebaseAuthState(firebaseUser) {
+  if (!firebaseUser) {
+    setCurrentUser(null);
+    await loadState();
+    updateUI();
+    applyAuthState();
+    return;
+  }
+
+  const profile = await fetchUserProfile(firebaseUser.uid);
+  setCurrentUser({
+    id: firebaseUser.uid,
+    email: firebaseUser.email || profile?.email || '',
+    accountName: profile?.accountName || firebaseUser.displayName || '',
+    profilePhoto: profile?.profilePhoto || firebaseUser.photoURL || ''
+  });
+  await loadState();
+  updateUI();
+  applyAuthState();
+}
+
+async function fetchUserProfile(uid) {
+  const services = getFirebaseServices();
+  if (!services?.db) return null;
+  const doc = await services.db.collection('users').doc(uid).get();
+  return doc.exists ? doc.data() : null;
+}
+
 function handleSignIn(event) {
   event.preventDefault();
   const form = event.target;
@@ -274,6 +323,20 @@ function handleSignIn(event) {
 
   if (!email || !password) {
     alert('メールアドレスとパスワードを入力してください。');
+    return;
+  }
+
+  const services = getFirebaseServices();
+  if (services?.auth) {
+    services.auth
+      .signInWithEmailAndPassword(email, password)
+      .then(() => {
+        closeAuthModal();
+        form.reset();
+      })
+      .catch((error) => {
+        alert(formatAuthError(error));
+      });
     return;
   }
 
@@ -311,6 +374,56 @@ async function handleSignUp(event) {
 
   if (!email || !password || !accountName || !birthYear || !birthMonth || !gender) {
     alert('必須項目をすべて入力してください。');
+    return;
+  }
+
+  const services = getFirebaseServices();
+  if (services?.auth && services?.db) {
+    try {
+      const photoInput = form.querySelector('input[name="profilePhoto"]');
+      const file = photoInput?.files?.[0];
+      if (file && file.size > MAX_PROFILE_PHOTO_SIZE) {
+        alert('プロフィール写真は2MB以下の画像にしてください。');
+        return;
+      }
+
+      const credential = await services.auth.createUserWithEmailAndPassword(email, password);
+      const uid = credential.user.uid;
+      let profilePhoto = '';
+
+      if (file) {
+        try {
+          profilePhoto = await uploadProfilePhoto(uid, file);
+        } catch (error) {
+          console.error('Failed to upload profile photo', error);
+          alert('プロフィール写真の保存に失敗しました。後で設定できます。');
+        }
+      }
+
+      const profile = {
+        email,
+        accountName,
+        birthYear,
+        birthMonth,
+        gender,
+        profilePhoto,
+        createdAt: new Date().toISOString()
+      };
+
+      await services.db.collection('users').doc(uid).set(profile, { merge: true });
+      if (accountName || profilePhoto) {
+        await credential.user.updateProfile({
+          displayName: accountName || '',
+          photoURL: profilePhoto || ''
+        });
+      }
+
+      closeAuthModal();
+      form.reset();
+      alert('登録が完了しました。');
+    } catch (error) {
+      alert(formatAuthError(error));
+    }
     return;
   }
 
@@ -360,10 +473,43 @@ async function handleSignUp(event) {
 }
 
 function handleSignOut() {
+  const services = getFirebaseServices();
+  if (services?.auth) {
+    services.auth.signOut().catch((error) => {
+      console.error('Failed to sign out', error);
+    });
+    return;
+  }
+
   setCurrentUser(null);
   loadState();
   updateUI();
   applyAuthState();
+}
+
+function formatAuthError(error) {
+  const code = error?.code || '';
+  if (code.includes('auth/email-already-in-use')) return 'このメールアドレスは既に登録されています。';
+  if (code.includes('auth/invalid-email')) return 'メールアドレスの形式が正しくありません。';
+  if (code.includes('auth/weak-password')) return 'パスワードが短すぎます（6文字以上）。';
+  if (code.includes('auth/user-not-found')) return 'アカウントが見つかりません。';
+  if (code.includes('auth/wrong-password')) return 'パスワードが違います。';
+  if (code.includes('auth/too-many-requests')) return '試行回数が多すぎます。しばらく待ってから試してください。';
+  return '認証に失敗しました。入力内容を確認してください。';
+}
+
+async function uploadProfilePhoto(uid, file) {
+  const services = getFirebaseServices();
+  if (!services?.storage) {
+    alert('プロフィール写真の保存にはFirebase Storageの有効化が必要です。');
+    return '';
+  }
+
+  const safeName = file.name.replace(/[^\w.-]+/g, '_');
+  const path = `profile-photos/${uid}/${Date.now()}-${safeName}`;
+  const ref = services.storage.ref().child(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
 }
 
 function createUserId() {
@@ -465,6 +611,9 @@ function resetDiagnosisInputs() {
   });
   state.preferences = {};
   localStorage.removeItem(getScopedKey(PREF_KEY_BASE));
+  clearPreferencesRemote().catch((error) => {
+    console.error('Failed to clear preferences', error);
+  });
   document.getElementById('diagnosisResult').innerHTML = '<p>入力が完了したら、あなたのタイプをここに表示します。</p>';
   highlightTypeCards([]);
 }
@@ -476,6 +625,9 @@ function handleLogSubmit(event) {
   const entry = buildEntryPayload(formData);
   state.entries.push(entry);
   saveEntries();
+  saveEntryRemote(entry).catch((error) => {
+    console.error('Failed to save entry', error);
+  });
   form.reset();
   resetRangeDisplays(form);
   ensureMonthValue(entry.date.substring(0, 7));
@@ -487,6 +639,9 @@ function clearAllEntries() {
   if (!confirm('保存済みの記録をすべて削除しますか？')) return;
   state.entries = [];
   saveEntries();
+  deleteAllEntriesRemote().catch((error) => {
+    console.error('Failed to delete entries', error);
+  });
   updateUI();
 }
 
@@ -546,23 +701,128 @@ function scrollToSection(id) {
 
 // -----------------------------------------------------------------------------
 // State persistence
-function loadState() {
+async function loadState() {
   migrateLegacyStorage();
+  const user = getCurrentUser();
+  if (user && isFirebaseReady()) {
+    try {
+      await loadRemoteState(user.id);
+    } catch (error) {
+      console.error('Failed to load remote state', error);
+      loadLocalState();
+    }
+  } else {
+    loadLocalState();
+  }
+  applyStoredPreferences();
+}
+
+function loadLocalState() {
   const stored = localStorage.getItem(getScopedKey(STORAGE_KEY_BASE));
   state.entries = stored ? JSON.parse(stored) : [];
 
   const pref = localStorage.getItem(getScopedKey(PREF_KEY_BASE));
   state.preferences = pref ? JSON.parse(pref) : {};
-  applyStoredPreferences();
+}
+
+async function loadRemoteState(userId) {
+  const services = getFirebaseServices();
+  if (!services?.db) {
+    loadLocalState();
+    return;
+  }
+
+  const entriesSnap = await services.db
+    .collection('users')
+    .doc(userId)
+    .collection('entries')
+    .orderBy('timestamp')
+    .get();
+  state.entries = entriesSnap.docs.map((doc) => doc.data());
+
+  const prefDoc = await services.db
+    .collection('users')
+    .doc(userId)
+    .collection('meta')
+    .doc('preferences')
+    .get();
+  state.preferences = prefDoc.exists ? prefDoc.data()?.values || {} : {};
 }
 
 function saveEntries() {
   localStorage.setItem(getScopedKey(STORAGE_KEY_BASE), JSON.stringify(state.entries));
 }
 
+async function saveEntryRemote(entry) {
+  const services = getFirebaseServices();
+  const user = getCurrentUser();
+  if (!services?.db || !user) return;
+
+  await services.db
+    .collection('users')
+    .doc(user.id)
+    .collection('entries')
+    .doc(entry.id)
+    .set(entry);
+}
+
+async function deleteAllEntriesRemote() {
+  const services = getFirebaseServices();
+  const user = getCurrentUser();
+  if (!services?.db || !user) return;
+
+  const entriesRef = services.db.collection('users').doc(user.id).collection('entries');
+  const snapshot = await entriesRef.get();
+  if (snapshot.empty) return;
+
+  const batchLimit = 450;
+  for (let i = 0; i < snapshot.docs.length; i += batchLimit) {
+    const batch = services.db.batch();
+    snapshot.docs.slice(i, i + batchLimit).forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
 function savePreferenceValue(questionId, value) {
   state.preferences[questionId] = value;
   localStorage.setItem(getScopedKey(PREF_KEY_BASE), JSON.stringify(state.preferences));
+  schedulePreferenceSave();
+}
+
+function schedulePreferenceSave() {
+  if (!isFirebaseReady() || !getCurrentUser()) return;
+  clearTimeout(preferenceSaveTimer);
+  preferenceSaveTimer = setTimeout(() => {
+    savePreferencesRemote().catch((error) => {
+      console.error('Failed to save preferences', error);
+    });
+  }, 500);
+}
+
+async function savePreferencesRemote() {
+  const services = getFirebaseServices();
+  const user = getCurrentUser();
+  if (!services?.db || !user) return;
+
+  await services.db
+    .collection('users')
+    .doc(user.id)
+    .collection('meta')
+    .doc('preferences')
+    .set({ values: state.preferences }, { merge: true });
+}
+
+async function clearPreferencesRemote() {
+  const services = getFirebaseServices();
+  const user = getCurrentUser();
+  if (!services?.db || !user) return;
+
+  await services.db
+    .collection('users')
+    .doc(user.id)
+    .collection('meta')
+    .doc('preferences')
+    .set({ values: {} }, { merge: true });
 }
 
 function applyStoredPreferences() {
