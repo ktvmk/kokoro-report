@@ -17,6 +17,7 @@ const state = {
 };
 
 let monthlyChart;
+let vitalsChart;
 
 document.addEventListener('DOMContentLoaded', initApp);
 
@@ -35,7 +36,7 @@ function initApp() {
   }
   attachGlobalHandlers();
   loadState();
-  if (document.getElementById('monthlyChart')) {
+  if (document.getElementById('monthlyChart') || document.getElementById('vitalsChart')) {
     initChart();
   }
   updateUI();
@@ -292,6 +293,7 @@ function loadDemoData() {
 function handleMonthChange(event) {
   const month = event.target.value;
   updateChart(month);
+  updateVitalsChart(month);
   updateRanking(month);
 }
 
@@ -399,13 +401,16 @@ function updateUI() {
   }
 
   const monthPicker = document.getElementById('monthPicker');
-  if (monthlyChart && document.getElementById('switchRanking')) {
+  if (monthlyChart || vitalsChart) {
     const month = monthPicker?.value || getCurrentMonth();
     if (monthPicker && !monthPicker.value) {
       ensureMonthValue(month);
     }
     updateChart(month);
-    updateRanking(month);
+    updateVitalsChart(month);
+    if (document.getElementById('switchRanking')) {
+      updateRanking(month);
+    }
   }
 
   if (document.getElementById('fatigueSummary')) {
@@ -450,62 +455,152 @@ function renderEntries() {
 // -----------------------------------------------------------------------------
 // Chart & Ranking
 function initChart() {
-  const ctx = document.getElementById('monthlyChart').getContext('2d');
-  monthlyChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: '気分',
-          data: [],
-          borderColor: '#ff8570',
-          tension: 0.3,
-          fill: false
-        },
-        {
-          label: '人間関係の負荷',
-          data: [],
-          borderColor: '#7b6cff',
-          tension: 0.3,
-          fill: false
-        },
-        {
-          label: '脈拍',
-          data: [],
-          borderColor: '#00a4a6',
-          tension: 0.3,
-          fill: false,
-          yAxisID: 'y1'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { intersect: false, mode: 'index' },
-      scales: {
-        x: {
-          title: { display: true, text: '日付' }
-        },
-        y: {
-          title: { display: true, text: '気分・ストレス（-10〜10）' },
-          suggestedMin: -10,
-          suggestedMax: 10,
-          grid: { drawBorder: false }
-        },
-        y1: {
-          position: 'right',
-          title: { display: true, text: '脈拍 (bpm)' },
-          suggestedMin: 50,
-          suggestedMax: 120,
-          grid: { drawBorder: false }
-        }
+  const monthlyCanvas = document.getElementById('monthlyChart');
+  if (monthlyCanvas) {
+    const ctx = monthlyCanvas.getContext('2d');
+    monthlyChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: '気分',
+            data: [],
+            borderColor: '#ff8570',
+            tension: 0.3,
+            fill: false
+          },
+          {
+            label: '人間関係の負荷',
+            data: [],
+            borderColor: '#7b6cff',
+            tension: 0.3,
+            fill: false
+          },
+          {
+            label: '脈拍',
+            data: [],
+            borderColor: '#00a4a6',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'y1'
+          }
+        ]
       },
-      plugins: {
-        legend: { display: true }
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+          x: {
+            title: { display: true, text: '日付' }
+          },
+          y: {
+            title: { display: true, text: '気分・ストレス（-10〜10）' },
+            suggestedMin: -10,
+            suggestedMax: 10,
+            grid: { drawBorder: false }
+          },
+          y1: {
+            position: 'right',
+            title: { display: true, text: '脈拍 (bpm)' },
+            suggestedMin: 50,
+            suggestedMax: 120,
+            grid: { drawBorder: false }
+          }
+        },
+        plugins: {
+          legend: { display: true }
+        }
       }
-    }
-  });
+    });
+  }
+
+  const vitalsCanvas = document.getElementById('vitalsChart');
+  if (vitalsCanvas) {
+    const ctx = vitalsCanvas.getContext('2d');
+    vitalsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: '心拍数 (bpm)',
+            data: [],
+            borderColor: '#ff8570',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'yVitals'
+          },
+          {
+            label: '血圧 (mmHg)',
+            data: [],
+            borderColor: '#7b6cff',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'yVitals'
+          },
+          {
+            label: '睡眠時間 (時間)',
+            data: [],
+            borderColor: '#00a4a6',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'yHours'
+          },
+          {
+            label: '睡眠時間 (分)',
+            data: [],
+            borderColor: '#69bce6',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'yMinutes'
+          },
+          {
+            label: '運動時間 (分)',
+            data: [],
+            borderColor: '#f2b84b',
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'yMinutes'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+          x: {
+            title: { display: true, text: '日付' }
+          },
+          yVitals: {
+            position: 'left',
+            title: { display: true, text: '心拍・血圧' },
+            suggestedMin: 40,
+            suggestedMax: 140,
+            grid: { drawBorder: false }
+          },
+          yHours: {
+            position: 'right',
+            title: { display: true, text: '睡眠 (時間)' },
+            suggestedMin: 0,
+            suggestedMax: 12,
+            grid: { drawOnChartArea: false }
+          },
+          yMinutes: {
+            position: 'right',
+            offset: true,
+            title: { display: true, text: '分 (睡眠/運動)' },
+            suggestedMin: 0,
+            suggestedMax: 300,
+            grid: { drawOnChartArea: false }
+          }
+        },
+        plugins: {
+          legend: { display: true }
+        }
+      }
+    });
+  }
 }
 
 function updateChart(month) {
@@ -517,6 +612,19 @@ function updateChart(month) {
   monthlyChart.data.datasets[1].data = monthEntries.map((entry) => entry.mind.relationshipLoad);
   monthlyChart.data.datasets[2].data = monthEntries.map((entry) => entry.body.heartRate);
   monthlyChart.update();
+}
+
+function updateVitalsChart(month) {
+  if (!vitalsChart) return;
+  const monthEntries = getEntriesByMonth(month);
+  const labels = monthEntries.map((entry) => new Date(entry.timestamp).getDate());
+  vitalsChart.data.labels = labels;
+  vitalsChart.data.datasets[0].data = monthEntries.map((entry) => entry.body.heartRate);
+  vitalsChart.data.datasets[1].data = monthEntries.map((entry) => parseBloodPressure(entry.body.bloodPressure));
+  vitalsChart.data.datasets[2].data = monthEntries.map((entry) => getSleepParts(entry.body.sleepMinutes).hours);
+  vitalsChart.data.datasets[3].data = monthEntries.map((entry) => getSleepParts(entry.body.sleepMinutes).minutes);
+  vitalsChart.data.datasets[4].data = monthEntries.map((entry) => entry.body.exerciseMinutes);
+  vitalsChart.update();
 }
 
 function updateRanking(month) {
@@ -938,6 +1046,22 @@ function formatSleep(minutes) {
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hrs}時間${mins}分`;
+}
+
+function getSleepParts(totalMinutes) {
+  const safeMinutes = Number(totalMinutes) || 0;
+  return {
+    hours: Math.floor(safeMinutes / 60),
+    minutes: safeMinutes % 60
+  };
+}
+
+function parseBloodPressure(value) {
+  if (!value) return null;
+  const match = String(value).match(/(\d{2,3})/);
+  if (!match) return null;
+  const number = Number(match[1]);
+  return Number.isNaN(number) ? null : number;
 }
 
 function hasSymptom(entry, candidates) {
