@@ -107,6 +107,7 @@ async function initApp() {
     initChart();
   }
   updateUI();
+  renderDiagnosisBadge();
 }
 
 // -----------------------------------------------------------------------------
@@ -719,6 +720,19 @@ function showDiagnosisForm() {
   scrollToSection('diagnosis');
 }
 
+// タスクD: 記録画面に「あなたは○○タイプ」小バッジを常時表示
+function renderDiagnosisBadge() {
+  const badge = document.getElementById('diagnosisBadge');
+  if (!badge) return;
+  const diag = loadDiagnosis();
+  if (diag && diag.topCategory && CATEGORY_LIBRARY[diag.topCategory]) {
+    badge.textContent = `あなたは「${CATEGORY_LIBRARY[diag.topCategory].title}」タイプ`;
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
 function handleLogSubmit(event) {
   event.preventDefault();
   const form = event.target;
@@ -960,6 +974,12 @@ function buildEntryPayload(formData) {
     };
   });
 
+  // タスクD: 記録時点の診断タイプをスナップショット（上位3つ。後から遡って書き換えない）
+  const diag = loadDiagnosis();
+  const diagnosisSnapshot = diag
+    ? { top: diag.topCategory || null, ranked3: (diag.rankedCategories || []).slice(0, 3), takenAt: diag.takenAt || null }
+    : null;
+
   return {
     id: date.toISOString(),
     date: date.toISOString().slice(0, 10),
@@ -979,6 +999,7 @@ function buildEntryPayload(formData) {
     },
     mind,
     switches,
+    diagnosisType: diagnosisSnapshot,
     diary: (formData.get('diary') || '').trim(),
     meta: {
       recordedHour: date.getHours()
@@ -1311,6 +1332,31 @@ function updateRanking(month) {
 
 // -----------------------------------------------------------------------------
 // Recommendations
+// タスクC: 疲労タイプの有効カテゴリ（鉄板=3 / 意外=2）を、本人の診断＝好みで再ランキング。
+// 好みはフィルタでなく重み（おすすめ度 = 有効度 ×(1 + 0.5×好み正規化)）。意外な一手（高有効度・低好み）を必ず1つ残す。
+function categoryLetterFrom(text) {
+  const match = String(text || '').match(/[A-H]/);
+  return match ? match[0] : null;
+}
+
+function personalizeFatigue(fatigue) {
+  const diag = loadDiagnosis();
+  const percents = diag && diag.percents ? diag.percents : null;
+  const maxPercent = percents ? Math.max(1, ...Object.values(percents)) : 1;
+  const prefNorm = (cat) => (percents && cat && percents[cat] != null ? percents[cat] / maxPercent : 0);
+  const slots = [
+    { cat: categoryLetterFrom(fatigue.diagnosisType), action: fatigue.pillars.iron, eff: 3 },
+    { cat: categoryLetterFrom(fatigue.pillars.surprise), action: fatigue.pillars.surprise, eff: 2 },
+  ].map((slot) => ({
+    ...slot,
+    title: slot.cat && CATEGORY_LIBRARY[slot.cat] ? CATEGORY_LIBRARY[slot.cat].title : '',
+    pref: prefNorm(slot.cat),
+    score: slot.eff * (1 + 0.5 * prefNorm(slot.cat)),
+  }));
+  const ordered = slots.slice().sort((a, b) => b.pref - a.pref); // メイン=好み高い方／意外=好み低い方
+  return { personalized: Boolean(percents), main: ordered[0], surprise: ordered[1], body: fatigue.pillars.body };
+}
+
 function updateRecommendations() {
   const target = document.getElementById('fatigueSummary');
   const patternTarget = document.getElementById('patternSuggestions');
@@ -1324,14 +1370,22 @@ function updateRecommendations() {
   const fatigue = detectFatigue(latest, state.entries);
 
   if (fatigue) {
+    const p = personalizeFatigue(fatigue);
+    const mainLabel = p.personalized ? 'あなた向けの一手' : '鉄板';
+    const surpriseLabel = p.personalized ? '意外な一手' : '意外';
+    const note = p.personalized && p.main.title
+      ? `<p class="muted">あなたの診断（${p.main.title}寄り）を反映しています。</p>`
+      : '';
+    const tag = (s) => (s.title ? `（${s.title}）` : '');
     target.innerHTML = `
       <article class="recommendation-card">
         <h3>No.${fatigue.no} ${fatigue.title}</h3>
         <p>${fatigue.advice}</p>
+        ${note}
         <ul>
-          <li><strong>鉄板:</strong> ${fatigue.pillars.iron}</li>
-          <li><strong>意外:</strong> ${fatigue.pillars.surprise}</li>
-          <li><strong>体調連動:</strong> ${fatigue.pillars.body}</li>
+          <li><strong>${mainLabel}:</strong> ${p.main.action}${tag(p.main)}</li>
+          <li><strong>${surpriseLabel}:</strong> ${p.surprise.action}${tag(p.surprise)}</li>
+          <li><strong>体調連動:</strong> ${p.body}</li>
         </ul>
       </article>`;
   } else {
