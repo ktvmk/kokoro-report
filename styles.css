@@ -670,3 +670,26 @@ footer {
     grid-column: auto;
   }
 }
+
+/* タスクB: 診断オンボーディング済みサマリー（あなたは○○タイプ／取り直す） */
+.diagnosis__onboarded {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  color: #233f58;
+}
+.diagnosis__onboarded-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+}
+.diagnosis__onboarded-text strong {
+  color: #1b3a5c;
+  background: linear-gradient(transparent 62%, rgba(246, 197, 101, 0.55) 62%);
+  padding: 0 0.15em;
+}

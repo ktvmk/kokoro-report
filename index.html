@@ -12,10 +12,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css?v=20260313230000">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-auth-compat.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-storage-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js" defer></script>
   <script src="./firebase-config.js?v=20260313230000" defer></script>
     <script src="./data.js?v=20260313203810" defer></script>
   <script src="./app.js?v=20260313230000" defer></script>
@@ -52,6 +52,12 @@
           <h2>ストレス対応タイプ診断</h2>
         </div>
         <button class="secondary" id="resetPreferences">入力をリセット</button>
+      </div>
+
+      <div class="diagnosis__onboarded" id="diagnosisOnboarded" hidden>
+        <p class="diagnosis__onboarded-text">あなたは <strong id="diagnosisOnboardedType">―</strong> タイプ</p>
+        <p class="section-lead">このタイプは毎日の「今日のおすすめ」に反映されます。診断は最初の1回でOKです。</p>
+        <button class="secondary" id="retakeDiagnosis">診断を取り直す</button>
       </div>
 
       <div class="diagnosis-steps">
@@ -130,7 +136,10 @@
               <input type="email" name="email" autocomplete="email" required>
             </label>
             <label>パスワード
-              <input type="password" name="password" autocomplete="new-password" required>
+              <input type="password" name="password" autocomplete="new-password" required minlength="6">
+            </label>
+            <label>パスワード（確認）
+              <input type="password" name="passwordConfirm" autocomplete="new-password" required minlength="6">
             </label>
             <label>生まれた年（西暦）
               <input type="number" name="birthYear" min="1900" max="2100" required>

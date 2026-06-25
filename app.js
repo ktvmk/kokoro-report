@@ -1,5 +1,6 @@
 const STORAGE_KEY_BASE = 'kororo-entries-v1';
 const PREF_KEY_BASE = 'kororo-preferences-v1';
+const DIAGNOSIS_KEY_BASE = 'kororo-diagnosis-v1';
 const USERS_KEY = 'kororo-users-v1';
 const CURRENT_USER_KEY = 'kororo-current-user-v1';
 const MAX_PROFILE_PHOTO_SIZE = 2 * 1024 * 1024;
@@ -84,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
   if (document.getElementById('step1Questions')) {
     renderDiagnosisQuestions();
+    applyDiagnosisOnboardingState();
   }
   if (document.getElementById('mindSliders')) {
     renderMindSliders();
@@ -186,6 +188,9 @@ function attachGlobalHandlers() {
   const resetBtn = document.getElementById('resetPreferences');
   if (resetBtn) resetBtn.addEventListener('click', resetDiagnosisInputs);
 
+  const retakeBtn = document.getElementById('retakeDiagnosis');
+  if (retakeBtn) retakeBtn.addEventListener('click', showDiagnosisForm);
+
   const logForm = document.getElementById('logForm');
   if (logForm) logForm.addEventListener('submit', handleLogSubmit);
 
@@ -262,6 +267,9 @@ function openAuthModal(mode = 'signin') {
 function closeAuthModal() {
   const modal = document.getElementById('authModal');
   if (!modal) return;
+  if (modal.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
   modal.classList.remove('is-open');
   modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('auth-open');
@@ -335,6 +343,7 @@ function handleSignIn(event) {
         form.reset();
       })
       .catch((error) => {
+        console.error('Sign in error:', error.code, error.message);
         alert(formatAuthError(error));
       });
     return;
@@ -367,6 +376,7 @@ async function handleSignUp(event) {
 
   const email = String(formData.get('email') || '').trim().toLowerCase();
   const password = String(formData.get('password') || '');
+  const passwordConfirm = String(formData.get('passwordConfirm') || '');
   const accountName = String(formData.get('accountName') || '').trim();
   const birthYear = Number(formData.get('birthYear'));
   const birthMonth = Number(formData.get('birthMonth'));
@@ -374,6 +384,16 @@ async function handleSignUp(event) {
 
   if (!email || !password || !accountName || !birthYear || !birthMonth || !gender) {
     alert('必須項目をすべて入力してください。');
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    alert('パスワードが一致しません。もう一度確認してください。');
+    return;
+  }
+
+  if (password.length < 6) {
+    alert('パスワードは6文字以上で設定してください。');
     return;
   }
 
@@ -494,8 +514,11 @@ function formatAuthError(error) {
   if (code.includes('auth/weak-password')) return 'パスワードが短すぎます（6文字以上）。';
   if (code.includes('auth/user-not-found')) return 'アカウントが見つかりません。';
   if (code.includes('auth/wrong-password')) return 'パスワードが違います。';
+  if (code.includes('auth/invalid-credential') || code.includes('auth/invalid-login-credentials')) return 'メールアドレスまたはパスワードが違います。';
   if (code.includes('auth/too-many-requests')) return '試行回数が多すぎます。しばらく待ってから試してください。';
-  return '認証に失敗しました。入力内容を確認してください。';
+  if (code.includes('auth/network-request-failed')) return 'ネットワークエラーが発生しました。接続を確認してください。';
+  if (code.includes('auth/operation-not-allowed')) return 'メール/パスワード認証が有効になっていません。Firebase コンソールで確認してください。';
+  return `認証に失敗しました。入力内容を確認してください。（${code}）`;
 }
 
 async function uploadProfilePhoto(uid, file) {
@@ -535,6 +558,24 @@ function handleRangeInput(event) {
   if (display) display.textContent = Number(event.target.value);
   if (event.target.matches('[data-question-id]')) {
     savePreferenceValue(event.target.dataset.questionId, Number(event.target.value));
+  }
+}
+
+// 診断結果の保存・読込（ユーザー別スコープ。タスクA: おすすめ個別化・記録スナップショットの土台）
+function saveDiagnosis(diagnosis) {
+  try {
+    localStorage.setItem(getScopedKey(DIAGNOSIS_KEY_BASE), JSON.stringify(diagnosis));
+  } catch (error) {
+    console.warn('診断結果の保存に失敗しました', error);
+  }
+}
+
+function loadDiagnosis() {
+  try {
+    const stored = localStorage.getItem(getScopedKey(DIAGNOSIS_KEY_BASE));
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    return null;
   }
 }
 
@@ -600,6 +641,25 @@ function handleDiagnosis() {
     .map(({ category }) => CATEGORY_TO_SWITCH[category])
     .filter(Boolean);
   highlightTypeCards(highlightKeys);
+
+  // タスクA: 診断結果を localStorage に保存（category 降順＋percent＋score＋topCategory＋取得日時）
+  const diagnosis = {
+    rankedCategories: resultList.map((item) => item.category),
+    percents: resultList.reduce((acc, item) => {
+      acc[item.category] = Number(item.percent.toFixed(1));
+      return acc;
+    }, {}),
+    scores: resultList.reduce((acc, item) => {
+      acc[item.category] = item.score;
+      return acc;
+    }, {}),
+    topCategory: resultList[0] ? resultList[0].category : null,
+    takenAt: new Date().toISOString(),
+  };
+  saveDiagnosis(diagnosis);
+
+  // タスクB: 診断したら大きいフォームを畳んで「あなたは○○タイプ」表示に切替
+  applyDiagnosisOnboardingState();
 }
 
 function resetDiagnosisInputs() {
@@ -616,6 +676,47 @@ function resetDiagnosisInputs() {
   });
   document.getElementById('diagnosisResult').innerHTML = '<p>入力が完了したら、あなたのタイプをここに表示します。</p>';
   highlightTypeCards([]);
+}
+
+// タスクB: 診断をオンボーディング化。診断済みなら大きいフォームを畳み、「あなたは○○タイプ／取り直す」だけ表示。
+function getDiagnosisFormParts() {
+  const section = document.getElementById('diagnosis');
+  if (!section) return null;
+  return {
+    section,
+    onboarded: document.getElementById('diagnosisOnboarded'),
+    formEls: [
+      section.querySelector('.diagnosis-steps'),
+      section.querySelector('.diagnosis__action'),
+      document.getElementById('resetPreferences'),
+    ],
+  };
+}
+
+function applyDiagnosisOnboardingState() {
+  const parts = getDiagnosisFormParts();
+  if (!parts) return;
+  const diag = loadDiagnosis();
+  if (diag && diag.topCategory) {
+    parts.formEls.forEach((el) => { if (el) el.hidden = true; });
+    if (parts.onboarded) {
+      parts.onboarded.hidden = false;
+      const meta = CATEGORY_LIBRARY[diag.topCategory];
+      const typeEl = document.getElementById('diagnosisOnboardedType');
+      if (typeEl) typeEl.textContent = meta ? meta.title : diag.topCategory;
+    }
+  } else {
+    parts.formEls.forEach((el) => { if (el) el.hidden = false; });
+    if (parts.onboarded) parts.onboarded.hidden = true;
+  }
+}
+
+function showDiagnosisForm() {
+  const parts = getDiagnosisFormParts();
+  if (!parts) return;
+  parts.formEls.forEach((el) => { if (el) el.hidden = false; });
+  if (parts.onboarded) parts.onboarded.hidden = true;
+  scrollToSection('diagnosis');
 }
 
 function handleLogSubmit(event) {
